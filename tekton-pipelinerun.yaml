@@ -1,0 +1,84 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: build-signal-cli-
+spec:
+  pipelineSpec:
+    workspaces:
+      - name: shared-workspace
+      - name: dockerconfig-ws
+        optional: true
+    params:
+      - name: IMAGE
+        type: string
+        description: Target image repository and tag
+      - name: CONTEXT_DIR
+        type: string
+        default: "."
+      - name: DOCKERFILE
+        type: string
+        default: "Dockerfile"
+    tasks:
+      # Step 1: Build & push container image with Kaniko or Buildah
+      - name: build-and-push
+        taskSpec:
+          workspaces:
+            - name: source
+            - name: dockerconfig
+              optional: true
+          params:
+            - name: IMAGE
+              type: string
+            - name: CONTEXT_DIR
+              type: string
+            - name: DOCKERFILE
+              type: string
+          steps:
+            - name: buildah-bud
+              image: quay.io/buildah/stable:v1.35.0
+              workingDir: $(workspaces.source.path)
+              securityContext:
+                privileged: true
+              script: |
+                #!/usr/bin/env bash
+                set -e
+                echo "Building $(params.IMAGE)..."
+                buildah bud \
+                  --format docker \
+                  --tls-verify=true \
+                  -f $(params.DOCKERFILE) \
+                  -t $(params.IMAGE) \
+                  $(params.CONTEXT_DIR)
+                
+                echo "Pushing $(params.IMAGE)..."
+                buildah push \
+                  --tls-verify=true \
+                  $(params.IMAGE)
+        params:
+          - name: IMAGE
+            value: $(params.IMAGE)
+          - name: CONTEXT_DIR
+            value: $(params.CONTEXT_DIR)
+          - name: DOCKERFILE
+            value: $(params.DOCKERFILE)
+        workspaces:
+          - name: source
+            workspace: shared-workspace
+          - name: dockerconfig
+            workspace: dockerconfig-ws
+  params:
+    - name: IMAGE
+      value: image-registry.openshift-image-registry.svc:5000/<your-namespace>/signal-cli:latest
+      # Or external registry: quay.io/<your-org>/signal-cli:latest
+  workspaces:
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    - name: dockerconfig-ws
+      secret:
+        secretName: regcred # Optional: secret with registry auth

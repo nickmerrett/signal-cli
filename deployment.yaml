@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: signal-cli-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signal-cli
+  labels:
+    app: signal-cli
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: signal-cli
+  template:
+    metadata:
+      labels:
+        app: signal-cli
+    spec:
+      securityContext:
+        fsGroupChangePolicy: "OnRootMismatch"
+      containers:
+        - name: signal-cli
+          image: signal-cli:latest
+          imagePullPolicy: Always
+          args:
+            - "--config"
+            - "/var/lib/signal-cli"
+            - "daemon"
+            - "--http"
+            - "0.0.0.0:8080"
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/signal-cli
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          livenessProbe:
+            httpGet:
+              path: /v1/qrcodelink
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /v1/qrcodelink
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: signal-cli-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signal-cli
+  labels:
+    app: signal-cli
+spec:
+  selector:
+    app: signal-cli
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
