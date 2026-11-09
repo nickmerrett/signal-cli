@@ -19,18 +19,21 @@ ENV SIGNAL_CLI_CONFIG_DIR=/var/lib/signal-cli \
 #    no OpenSSL, because the TLS stack is inside the GraalVM native image.
 #    ca-certificates must REMAIN installed: signal-cli talks TLS to Signal's servers
 #    and reads the system trust store.
+#    NOTE: in Wolfi the tar command comes from a package named 'gnutar', not 'tar'.
+#    The index lists it as "p:cmd:tar=1.35-r11", so `apk add tar` fails with
+#    "no such package" while curl, gzip, zlib and ca-certificates all resolve.
 # 2. Download and extract AsamK/signal-cli Linux-native package (archive contains just
 #    the single binary 'signal-cli').
-# 3. Drop curl/tar/gzip again - they are build-time only, so the final image carries
-#    no download tooling. apk will not remove anything zlib or ca-certificates still
-#    depend on.
+# 3. Drop curl/gzip/gnutar again - they are build-time only, so the final image
+#    carries no download or archive tooling. zlib and ca-certificates stay, being
+#    genuine runtime dependencies of the binary.
 # 4. Configure GID 0 permissions for OpenShift arbitrary UID compatibility.
-RUN apk add --no-cache zlib ca-certificates curl tar gzip && \
+RUN apk add --no-cache zlib ca-certificates curl gzip gnutar && \
     mkdir -p /opt/signal-cli/bin /var/lib/signal-cli && \
     curl -fsSL "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz" \
     | tar -xz -C /opt/signal-cli/bin && \
     ln -s /opt/signal-cli/bin/signal-cli /usr/local/bin/signal-cli && \
-    apk del curl tar gzip && \
+    apk del curl gzip gnutar && \
     chgrp -R 0 /var/lib/signal-cli /opt/signal-cli && \
     chmod -R g+rwX /var/lib/signal-cli /opt/signal-cli
 
