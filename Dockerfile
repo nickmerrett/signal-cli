@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 USER 0
 
-ARG SIGNAL_CLI_VERSION=0.14.8
+ARG SIGNAL_CLI_VERSION=0.14.10
 ENV SIGNAL_CLI_CONFIG_DIR=/var/lib/signal-cli \
     HOME=/var/lib/signal-cli
 
