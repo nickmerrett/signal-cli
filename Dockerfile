@@ -27,12 +27,16 @@ ENV SIGNAL_CLI_CONFIG_DIR=/var/lib/signal-cli \
 # 3. Drop curl/gzip/gnutar again - they are build-time only, so the final image
 #    carries no download or archive tooling. zlib and ca-certificates stay, being
 #    genuine runtime dependencies of the binary.
+#    NOTE: link into /usr/bin, not /usr/local/bin. Wolfi has no /usr/local/bin, so the
+#    ubi9 form fails with "No such file or directory" - ln cannot create a link inside
+#    a directory that does not exist. /usr/bin exists and is on PATH, so the live
+#    Deployment's `command: [signal-cli, ...]` resolves with no PATH changes.
 # 4. Configure GID 0 permissions for OpenShift arbitrary UID compatibility.
 RUN apk add --no-cache zlib ca-certificates curl gzip gnutar && \
     mkdir -p /opt/signal-cli/bin /var/lib/signal-cli && \
     curl -fsSL "https://github.com/AsamK/signal-cli/releases/download/v${SIGNAL_CLI_VERSION}/signal-cli-${SIGNAL_CLI_VERSION}-Linux-native.tar.gz" \
     | tar -xz -C /opt/signal-cli/bin && \
-    ln -s /opt/signal-cli/bin/signal-cli /usr/local/bin/signal-cli && \
+    ln -s /opt/signal-cli/bin/signal-cli /usr/bin/signal-cli && \
     apk del curl gzip gnutar && \
     chgrp -R 0 /var/lib/signal-cli /opt/signal-cli && \
     chmod -R g+rwX /var/lib/signal-cli /opt/signal-cli
